@@ -10,7 +10,7 @@ import { HttpClientModule } from '@angular/common/http';
   declarations: [
     AppComponent
   ],
-  imports: [
+  imports: [  
     BrowserModule,
     FormsModule,
     HttpClientModule
