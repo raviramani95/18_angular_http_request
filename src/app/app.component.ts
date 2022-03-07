@@ -1,55 +1,70 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { threadId } from 'worker_threads';
 import { Post } from './post.model';
+import { PostsService } from './posts.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent implements OnInit{
+export class AppComponent implements OnInit, OnDestroy{
   loadedPosts: Post[] = [];
+  isFetching = false;
   url = 'https://ng-complete-guide-55795-default-rtdb.firebaseio.com/';
+  error = null;
+  private errorSub: Subscription;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private postService: PostsService) {}
 
   ngOnInit() {
-    this.fetchPosts();
+    this.errorSub = this.postService.error.subscribe(errorMessage => {
+      this.error = errorMessage;
+    })
+
+    this.isFetching = true;
+    this.postService.fetchPosts().subscribe(posts => {
+      this.isFetching = false;
+      this.loadedPosts = posts;
+    }, error => {
+      this.isFetching = false;
+      this.error = error.message;
+    });
   }
 
   onCreatePost(postData: Post) {
     // Send Http request
-    this.http.post<{ name: string }>(this.url + 'posts.json', postData)
-      .subscribe(responseData => {
-        console.log(responseData);
-      });
+    this.postService.CreateAndStorePost(postData.title, postData.content);
+   
+  }
+
+  onErrorHandel(){
+    this.error = null;
   }
 
   onFetchPosts() {
     // Send Http request
-    this.fetchPosts();
+    this.isFetching = true;
+    this.postService.fetchPosts().subscribe(posts => {
+      this.isFetching = false;
+      this.loadedPosts = posts;
+    }, error => {
+      this.isFetching = false;
+      this.error = error.message;
+    });
   }
 
   onClearPosts() {
     // Send Http request
+    this.postService.deletePosts().subscribe(() => {
+      this.loadedPosts = [];
+    })
   }
 
-  private fetchPosts(){
-    this.http.get<{ [key: string]: Post}>(this.url + 'posts.json')
-      .pipe(
-        map(responseData => {
-          const postsArray: Post[] = [];
-          for(const key in responseData){
-            if(responseData.hasOwnProperty(key)){
-              postsArray.push({...responseData[key], id: key});
-            } 
-          }
-          return postsArray;
-        })
-      )
-      .subscribe(posts => {
-        this.loadedPosts = posts;
-    });
+  ngOnDestroy(): void {
+    this.errorSub.unsubscribe();
   }
 }
